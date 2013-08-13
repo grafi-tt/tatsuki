@@ -17,13 +17,11 @@ type BoardPos = Word8
 type LinePos = Word8
 
 infixl 8 ↩ ↪ ↻ ↺
-infixl 6 .⊻.
 
 (↩) = unsafeShiftL
 (↪) = unsafeShiftR
 (↻) = rotateL
 (↺) = rotateR
-(.⊻.) = xor
 
 -- http://hackage.haskell.org/package/binary-literal-qq
 b = QuasiQuoter
@@ -140,14 +138,25 @@ admissible (!b, !w) =
     -- TODO The compiler may know associativity and do optimization.
     (((l7 | r7) | (u7 | d7)) | ((ul7 | ur7) | (dl7 | dr7))) & blank
 
+foldAdmissible :: (BoardPos -> a -> a) -> a -> Board -> a
+foldAdmissible f init brd = loop init (admissible brd)
+  where
+    loop acc 0 = acc
+    loop acc tmp =
+      let lso = tmp .&. (-tmp)
+          tmp' = tmp - lso
+          pos = popCount (lso - 1)
+      in  loop (f pos acc) tmp'
+
+
 flipLine :: LinePos -> Line -> HemiLine
-flipLine !pos (!b, !w) = inner .⊻. mask
+flipLine !pos (!b, !w) = inner `xor` mask
   where
     !selector = pos ↩ 8
 
     !inner = unsafeAt lineArray (selector | not w)
     !outer = unsafeAt lineArray (selector | b)
-    !mask = unsafeAt linkArray (selector | (inner .⊻. outer))
+    !mask = unsafeAt linkArray (selector | (inner `xor` outer))
 
 toLRLine :: BoardPos -> HemiBoard -> HemiLine
 toLRLine pos brd = brd ↪ 
