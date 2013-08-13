@@ -155,11 +155,11 @@ toLRLine pos brd = brd ↪
 flipBoard :: BoardPos -> Board -> Board
 flipBoard !pos (!b, !w) = 
   where
-    pos' = fromIntegral pos :: Word64
-    !x = pos' .&. 7
-    !x8 = x ↩ 3
-    !y = pos' ↪ 3
-    !y8 = y ↩ 3
+    x :: Int
+    !x = fromIntegral $ pos .&. 7
+    y :: Int
+    !y = fromIntegral $ pos ↪ 3
+
     !xyuldr = x - y
     !xyurdl = x + y - 7
 
@@ -170,12 +170,21 @@ flipBoard !pos (!b, !w) =
     uldrMask = [b|1000000001000000001000000001000000001000000001000000001000000001|]
     urdlMask = [b|0000000100000010000001000000100000010000001000000100000010000000|]
 
-    toLRLine brd = brd ↪ y8 .&. 255
+    toLRLine brd = brd ↪ (y ↩ 3) .&. 255
     toUDLine brd = (((brd ↪ x) .&. udMask) * vertMul) ↪ 56
     toULDRLine brd = (((brd ↻ (xyuldr ↩ 3)) .&. uldrMask) * diagMul) ↪ 56
     toURDLLine brd = (((brd ↺ (xyurdl ↩ 3)) .&. urdlMask) * diagMul) ↪ 56
 
-    flipLine x (toLRLine b, toLRLine w)
-    flipLine y (toUDLine b, toUDLine w)
-    flipLine x (toULDRLine b, toULDRLine w )
-    flipLine x (toURDLLine b, toURDLLine w)
+    fromLRLine line = line ↩ (y ↩ 3)
+    fromUDLine line = ((line .&. 127) * vertMul) ↪ (7 - x) .|. (line .&. 128) ↩ (49 + x)
+    fromULDRLine line = (line * diagMul) .&. uldrMask
+    fromURDLLine line = (line * diagMul) .&. urdlMask
+
+    borderMask pos = r .&. l
+      where l = 254 ↩ pos
+            r = r ↪ 1
+
+    !lrFlip = flipLine x (toLRLine b, toLRLine w)
+    !udFlip = flipLine y (toUDLine b, toUDLine w)
+    flipLine x (toULDRLine b, toULDRLine w .&. borderMask xyuldr)
+    flipLine x (toURDLLine b, toURDLLine w .&. borderMask xyurdl)
