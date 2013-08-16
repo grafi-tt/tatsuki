@@ -11,8 +11,6 @@ import Data.Int
 import Data.Word
 
 import Language.Literals.Binary
---import Language.Haskell.TH.Quote
---import Language.Haskell.TH.Syntax
 
 type HemiBoard = Word64
 type Board = (HemiBoard, HemiBoard)
