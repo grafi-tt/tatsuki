@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, BangPatterns, TemplateHaskell, QuasiQuotes, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns, BangPatterns, QuasiQuotes, TypeSynonymInstances, FlexibleInstances #-}
 module Reversi.BitBoard (
   HemiBoard, Board, BoardPos,
   IteratePos,
