@@ -1,5 +1,13 @@
-{-# LANGUAGE ViewPatterns, BangPatterns, TemplateHaskell, QuasiQuotes #-}
-module BitBoard where
+{-# LANGUAGE ViewPatterns, BangPatterns, TemplateHaskell, QuasiQuotes, TypeSynonymInstances, FlexibleInstances #-}
+module Reversi.BitBoard (
+  HemiBoard, Board, BoardPos,
+  IteratePos,
+  foldPos,
+  admissible,
+  flipBoard
+) where
+
+import Prelude hiding (null)
 
 import Control.Applicative
 import Control.Arrow
@@ -9,6 +17,7 @@ import Data.Array.Unboxed
 import Data.Bits
 import Data.Int
 import Data.Word
+import Data.PQueue.Max
 
 import Language.Literals.Binary
 
@@ -18,6 +27,25 @@ type HemiLine = Word8
 type Line = (HemiLine, HemiLine)
 type BoardPos = Word8
 type LinePos = Word8
+
+class IteratePos t where
+  foldPos :: (BoardPos -> a -> a) -> a -> t -> a
+
+instance IteratePos HemiBoard where
+  foldPos _ acc 0 = acc
+  foldPos f acc tmp =
+    let lso = tmp .&. (-tmp)
+        tmp' = tmp - lso
+        pos = fromIntegral $ popCount (lso - 1)
+    in  foldPos f (f pos acc) tmp'
+
+instance IteratePos Board where
+  foldPos f acc = foldPos f acc . admissible
+
+instance Ord k => IteratePos (MaxPQueue k BoardPos) where
+  foldPos f acc pq | null pq   = acc
+                   | otherwise = let ((_, pos), pq') = deleteFindMax pq
+                                 in  foldPos f (f pos acc) pq'
 
 infixl 8 ↩, ↪, ↻, ↺
 
@@ -147,17 +175,6 @@ admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) 
     dl5 = dl4 .|. dl4 ↪ 7 .&. lrw
     dl6 = dl5 .|. dl5 ↪ 7 .&. lrw
     dl7 = dl6 ↪ 7
-
-
-foldAdmissible :: (BoardPos -> a -> a) -> a -> Board -> a
-foldAdmissible f init brd = loop init (admissible brd)
-  where
-    loop acc 0 = acc
-    loop acc tmp =
-      let lso = tmp .&. (-tmp)
-          tmp' = tmp - lso
-          pos = fromIntegral $ popCount (lso - 1)
-      in  loop (f pos acc) tmp'
 
 
 flipLine :: Int -> Line -> HemiLine

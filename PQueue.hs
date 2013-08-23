@@ -1,21 +1,35 @@
 -- Leftist Heap
-module Data.PQueue.Max (MaxPQueue, union, empty, singleton, insert, findMax, deleteFindMax) where
+module Data.PQueue.Max (
+  MaxPQueue,
+  null,
+  empty,
+  singleton,
+  union,
+  insert,
+  findMax, deleteMax, deleteFindMax
+) where
+
+import Prelude hiding (null)
 
 data MaxPQueue k v = Nil | Node Int k v (MaxPQueue k v) (MaxPQueue k v)
 
 -- public
-union :: Ord k => MaxPQueue k v -> MaxPQueue k v -> MaxPQueue k v
-union Nil u = u
-union t Nil = t
-union t@(Node _ kt vt lt rt) u@(Node _ ku vu lu ru)
-  | kt > ku   = leftistTree kt vt lt (union u rt)
-  | otherwise = leftistTree ku vu lu (union t ru)
+null :: MaxPQueue k v -> Bool
+null Nil = False
+null _   = True
 
 empty :: MaxPQueue k v
 empty = Nil
 
 singleton :: k -> v -> MaxPQueue k v
 singleton k v = Node 1 k v Nil Nil
+
+union :: Ord k => MaxPQueue k v -> MaxPQueue k v -> MaxPQueue k v
+union Nil u = u
+union t Nil = t
+union t@(Node _ kt vt lt rt) u@(Node _ ku vu lu ru)
+  | kt > ku   = leftistTree kt vt lt (union u rt)
+  | otherwise = leftistTree ku vu lu (union t ru)
 
 insert :: Ord k => k -> v -> MaxPQueue k v -> MaxPQueue k v
 insert k v = union $ singleton k v
