@@ -3,8 +3,10 @@ module Reversi.BitBoard (
   HemiBoard, Board, BoardPos,
   IteratePos,
   foldPos,
+  nullPos,
   admissible,
-  flipBoard
+  flipBoard,
+  changeTurn
 ) where
 
 import Prelude hiding (null)
@@ -21,6 +23,7 @@ import Data.PQueue.Max
 
 import Language.Literals.Binary
 
+-- TODO defining data constructor having strict fields for Board and Line in conjuction with -funbox-strict-fields may produce better code, while the improvement probably be limited since unpacking Board does not occupy large part of logic.
 type HemiBoard = Word64
 type Board = (HemiBoard, HemiBoard)
 type HemiLine = Word8
@@ -30,22 +33,30 @@ type LinePos = Word8
 
 class IteratePos t where
   foldPos :: (BoardPos -> a -> a) -> a -> t -> a
+  nullPos :: t -> Bool -- It is a bit dirty, but needed for efficient handling of pass, which I cannot handle efficiently only with fodling.
 
 instance IteratePos HemiBoard where
+  -- if f is strict for it's argument, no boxing needed (while it's probably notorious premature optimization, and I don't even complehend behavior in conjunction with foldEdge...)
+  {-# INLINE foldPos #-}
   foldPos _ acc 0 = acc
-  foldPos f acc tmp =
-    let lso = tmp .&. (-tmp)
-        tmp' = tmp - lso
-        pos = fromIntegral $ popCount (lso - 1)
+  foldPos f !acc !tmp =
+    let !lso = tmp .&. (-tmp)
+        !tmp' = tmp - lso
+        !pos = fromIntegral $ popCount (lso - 1)
     in  foldPos f (f pos acc) tmp'
+  nullPos 0 = False
+  nullPos _ = True
 
 instance IteratePos Board where
   foldPos f acc = foldPos f acc . admissible
+  nullPos = nullPos . admissible
 
 instance Ord k => IteratePos (MaxPQueue k BoardPos) where
   foldPos f acc pq | null pq   = acc
                    | otherwise = let ((_, pos), pq') = deleteFindMax pq
                                  in  foldPos f (f pos acc) pq'
+  nullPos = null
+
 
 infixl 8 ↩, ↪, ↻, ↺
 
@@ -104,7 +115,6 @@ admissible :: Board -> HemiBoard
 admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) .|. (dl7 .|. dr7))) .&. blank
   where
     blank = complement (black .|. white)
-    lrMask :: HemiBoard
     lrMask = [b|0111111001111110011111100111111001111110011111100111111001111110|]
 
     lrw = lrMask .&. white
@@ -219,9 +229,12 @@ flipBoard !pos (!black, !white) = ((black `xor` flip) .|. 1 ↩ fromIntegral pos
       where l = 254 ↩ pos
             r = r ↪ 1
 
-    !lrFlip = fromLRLine $ flipLine x (toLRLine black, toLRLine white)
-    !udFlip = fromUDLine $ flipLine y (toUDLine black, toUDLine white)
-    !xyuldrFlip = fromULDRLine $ flipLine xyuldr (toULDRLine black, toULDRLine white .&. borderMask xyuldr)
-    !xyurdlFlip = fromURDLLine $ flipLine xyurdl (toURDLLine black, toURDLLine white .&. borderMask xyurdl)
+    lrFlip = fromLRLine $ flipLine x (toLRLine black, toLRLine white)
+    udFlip = fromUDLine $ flipLine y (toUDLine black, toUDLine white)
+    xyuldrFlip = fromULDRLine $ flipLine xyuldr (toULDRLine black, toULDRLine white .&. borderMask xyuldr)
+    xyurdlFlip = fromURDLLine $ flipLine xyurdl (toURDLLine black, toURDLLine white .&. borderMask xyurdl)
 
     flip = (lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)
+
+changeTurn :: Board -> Board
+changeTurn (bk, wt) = (wt, bk)
