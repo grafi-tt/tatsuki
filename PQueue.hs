@@ -52,4 +52,4 @@ rank (Node r _ _ _ _) = r
 leftistTree :: k -> v -> MaxPQueue k v -> MaxPQueue k v -> MaxPQueue k v
 leftistTree k v t u
   | rank t > rank u = Node (rank u + 1) k v t u
-  | otherwise       = Node (rank t + 1 )k v u t
+  | otherwise       = Node (rank t + 1) k v u t
