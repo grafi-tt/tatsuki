@@ -1,13 +1,5 @@
 {-# LANGUAGE ViewPatterns, BangPatterns, QuasiQuotes, TypeSynonymInstances, FlexibleInstances #-}
-module Reversi.BitBoard (
-  HemiBoard, Board, BoardPos,
-  IteratePos,
-  foldPos,
-  nullPos,
-  admissible,
-  flipBoard,
-  changeTurn
-) where
+module Reversi.Tatsuki.BitBoard where
 
 import Prelude hiding (null)
 
@@ -23,6 +15,7 @@ import Data.PQueue.Max
 
 import Language.Literals.Binary
 
+-- TODO wrap HemiBoard by newtype
 -- TODO defining data constructor having strict fields for Board and Line in conjuction with -funbox-strict-fields may produce better code, while the improvement probably be limited since unpacking Board does not occupy large part of logic.
 type HemiBoard = Word64
 type Board = (HemiBoard, HemiBoard)
@@ -44,8 +37,8 @@ instance IteratePos HemiBoard where
         !tmp' = tmp - lso
         !pos = fromIntegral $ popCount (lso - 1)
     in  foldPos f (f pos acc) tmp'
-  nullPos 0 = False
-  nullPos _ = True
+  nullPos 0 = True
+  nullPos _ = False
 
 instance IteratePos Board where
   foldPos f acc = foldPos f acc . admissible
@@ -83,7 +76,6 @@ LSB first
 07 06 05 04 03 02 01 00
 -}
 
-
 outFlankArray :: UArray Int HemiLine
 outFlankArray = listArray (0, 511) $ f <$> [0 .. 511]
   where
@@ -117,6 +109,12 @@ flipLine !intPos !blackLine !whiteLine = fromIntegral flipped
 
 
 -- TODO confirm the possibility of loop-unrolling by the compiler
+initialBoard :: Board
+initialBoard =
+  ( [b|0000000000000000000000000000100000010000000000000000000000000000|]
+  , [b|0000000000000000000000000001000000001000000000000000000000000000|]
+  )
+
 admissible :: Board -> HemiBoard
 admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) .|. (dl7 .|. dr7))) .&. blank
   where

@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns, QuasiQuotes, TupleSections #-}
-module Reversi.Search where
+module Reversi.Tatsuki.Search where
 
 import Prelude hiding (null)
 
@@ -9,20 +9,38 @@ import Control.Arrow
 import Control.Monad.ST
 import Data.Bits
 import Data.Int
+import Data.IORef
 import Data.PQueue.Max
-import Reversi.BitBoard
+import Reversi.Tatsuki.BitBoard
+import System.IO.Unsafe
 
 import Language.Literals.Binary
 
--- TODO move parameters to other file
+-- Parameters
 orderDepth = 3
+searchDepth = 5
 
+-- Global vars
+data SearchLog = SearchLog
+  { hoge :: Int
+  }
 
-data SearchData = SearchData {
-  hoge :: Int
-  -- TODO transposition table
-}
+emptyLog :: SearchLog
+emptyLog = SearchLog { hoge = 0 }
 
+searchLogRef :: IORef SearchLog
+{-# NOINLINE searchLogRef #-}
+searchLogRef = unsafePerformIO (newIORef emptyLog)
+
+resetSearchLog :: IO ()
+resetSearchLog = writeIORef searchLogRef emptyLog
+
+getSearchLog :: IO SearchLog
+getSearchLog = readIORef searchLogRef
+
+-- TODO declare and use transpostion table typed as IOUArray similary as above
+
+-- Evaluate
 type Score = Int32
 
 maxScore :: Score
@@ -31,7 +49,7 @@ maxScore = maxBound
 minScore :: Score
 minScore = (-maxBound)
 
-evaluate :: Board -> ST SearchData Score
+evaluate :: Board -> IO Score
 evaluate board@(black, white) =
   let !bCount = popCount black
       !wCount = popCount white
@@ -67,6 +85,7 @@ evaluate board@(black, white) =
         else
           diffCornerCount `unsafeShiftL` 6 + diffAdmCount `unsafeShiftL` 3 + parity
 
+-- Search
 type Edge = Maybe BoardPos
 foldEdge :: IteratePos t => (Edge -> a -> a) -> a -> t -> a
 foldEdge f acc set | nullPos set = f Nothing acc
@@ -77,10 +96,10 @@ moveBoard Nothing board = board
 moveBoard (Just pos) board = flipBoard pos board
 
 
-orderEvaluate :: Board -> ST SearchData Score
+orderEvaluate :: Board -> IO Score
 orderEvaluate board = (<$>) negate $ searchScore orderDepth minScore maxScore $ changeTurn board
 
-order :: Board -> ST SearchData (MaxPQueue Score BoardPos)
+order :: Board -> IO (MaxPQueue Score BoardPos)
 order board = foldPos f (return empty) board
   where
     f pos pqM = do
@@ -92,14 +111,21 @@ order board = foldPos f (return empty) board
 countCorner :: HemiBoard -> Int
 countCorner = fromIntegral . popCount . (.&. [b|1000000100000000000000000000000000000000000000000000000010000001|])
 
+-- TODO adjust parameter
+findEdge :: Board -> IO Edge
+findEdge board = searchEdge depth board
+  where
+    depth = case popCount (admissible board) of
+      count | count >= 50 -> 64 - count
+            | otherwise   -> 8
 
-searchEdge :: Int -> Board -> ST SearchData Edge
+searchEdge :: Int -> Board -> IO Edge
 searchEdge !depth !board = snd <$> searchGeneral depth minScore maxScore board
 
-searchScore :: Int -> Score -> Score -> Board -> ST SearchData Score
+searchScore :: Int -> Score -> Score -> Board -> IO Score
 searchScore !depth !α !β !board = fst <$> searchGeneral depth α β board
 
-searchGeneral :: Int -> Score -> Score -> Board -> ST SearchData (Score, Edge)
+searchGeneral :: Int -> Score -> Score -> Board -> IO (Score, Edge)
 searchGeneral !depth !α !β !board
   | depth <= orderDepth = search' board
   | otherwise           = search' board

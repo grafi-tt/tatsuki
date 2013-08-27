@@ -4,13 +4,13 @@
 
 module Main where
 
-import Control.Monad
-
+import Reversi.Client
 import Network
 import System.Console.GetOpt
 import System.Environment (getArgs)
 import System.IO
-import Text.Printf
+
+import MainClient
 
 data Config = Config { host :: HostName
                      , port :: PortNumber
@@ -40,7 +40,7 @@ options =
            "show this help"
   ]
 
-usageMessage :: IO ()
+usageMessage :: String
 usageMessage = usageInfo header options
   where
     header = "Usage: \n" ++
