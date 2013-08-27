@@ -19,10 +19,9 @@ import Language.Literals.Binary
 -- TODO defining data constructor having strict fields for Board and Line in conjuction with -funbox-strict-fields may produce better code, while the improvement probably be limited since unpacking Board does not occupy large part of logic.
 type HemiBoard = Word64
 type Board = (HemiBoard, HemiBoard)
-type HemiLine = Word8
-type Line = (HemiLine, HemiLine)
-type BoardPos = Word8
-type LinePos = Word8
+type BoardPos = Int
+
+type Line = Word8
 
 class IteratePos t where
   foldPos :: (BoardPos -> a -> a) -> a -> t -> a
@@ -31,7 +30,7 @@ class IteratePos t where
 instance IteratePos HemiBoard where
   -- if f is strict for it's argument, no boxing needed (while it's probably notorious premature optimization, and I don't even complehend behavior in conjunction with foldEdge...)
   {-# INLINE foldPos #-}
-  foldPos _ acc 0 = acc
+  foldPos _ !acc 0 = acc
   foldPos f !acc !tmp =
     let !lso = tmp .&. (-tmp)
         !tmp' = tmp - lso
@@ -76,7 +75,7 @@ LSB first
 07 06 05 04 03 02 01 00
 -}
 
-outFlankArray :: UArray Int HemiLine
+outFlankArray :: UArray Int Line
 outFlankArray = listArray (0, 511) $ f <$> [0 .. 511]
   where
     split ix = (ix .&. 7, (fromIntegral $ ix ↪ 3) ↩ 1)
@@ -89,7 +88,7 @@ outFlankArray = listArray (0, 511) $ f <$> [0 .. 511]
           | ok = place
           | otherwise = 0
 
-flippedArray :: UArray Int HemiLine
+flippedArray :: UArray Int Line
 flippedArray = listArray (0, 136) $ f <$> [0 .. 136]
   where
     split ix = (ix .&. 7, fromIntegral $ ix ↪ 3)
@@ -191,14 +190,15 @@ admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) 
     dl7 = dl6 ↪ 7
 
 
-
 flipBoard :: BoardPos -> Board -> Board
-flipBoard !pos (!black, !white) = ((black `xor` flip) .|. 1 ↩ fromIntegral pos, white `xor` flip)
+flipBoard !pos (!black, !white) = ((black `xor` fl) .|. 1 ↩ fromIntegral pos, white `xor` fl)
+  where fl = flipped pos (black, white)
+
+flipped :: BoardPos -> Board -> HemiBoard
+flipped !pos (!black, !white) = (lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)
   where
-    x :: Int
-    x = fromIntegral $ pos .&. 7
-    y :: Int
-    y = fromIntegral $ pos ↪ 3
+    x = pos .&. 7
+    y = pos ↪ 3
 
     xyuldr = y - x
     xyurdl = x + y - 7
@@ -228,8 +228,6 @@ flipBoard !pos (!black, !white) = ((black `xor` flip) .|. 1 ↩ fromIntegral pos
     udFlip = fromUDLine $ flipLine y (toUDLine black) (toUDLine white)
     xyuldrFlip = fromULDRLine $ flipLine xyuldr (toULDRLine black) (toULDRLine white .&. borderMask xyuldr)
     xyurdlFlip = fromURDLLine $ flipLine xyurdl (toURDLLine black) (toURDLLine white .&. borderMask xyurdl)
-
-    flip = (lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)
 
 changeTurn :: Board -> Board
 changeTurn (bk, wt) = (wt, bk)
