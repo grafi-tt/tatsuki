@@ -84,30 +84,36 @@ LSB first
 -}
 
 
-lineArray :: UArray Int HemiLine
-lineArray = listArray (0, 2047) $ f <$> [0 .. 2047]
+outFlankArray :: UArray Int HemiLine
+outFlankArray = listArray (0, 511) $ f <$> [0 .. 511]
   where
-    split ix = (ix ↪ 8, fromIntegral $ ix .&. 255)
-    f (split -> (pos, line)) = (l7 .|. r7)
+    split ix = (ix .&. 7, (fromIntegral $ ix ↪ 3) ↩ 1)
+    f (split -> (pos, line)) = loop (↩ 1) (init ↩ 1) False .|. loop (↪ 1) (init ↪ 1) False
       where
-        blank = complement line
-        place = 1 ↩ pos
+        init = 1 ↩ pos
+        loop f place ok
+          | (place .&. 63 == 0) = 0
+          | (place .&. line) /= 0 = loop f (f place) True
+          | ok = place
+          | otherwise = 0
 
-        l1 = place ↩ 1 .&. blank
-        l2 = l1 .|. l1 ↩ 1 .&. blank
-        l3 = l2 .|. l2 ↩ 1 .&. blank
-        l4 = l3 .|. l3 ↩ 1 .&. blank
-        l5 = l4 .|. l4 ↩ 1 .&. blank
-        l6 = l5 .|. l5 ↩ 1 .&. blank
-        l7 = if l6 .&. 128 == 0 then l6 else 0
+flippedArray :: UArray Int HemiLine
+flippedArray = listArray (0, 136) $ f <$> [0 .. 136]
+  where
+    split ix = (ix .&. 7, fromIntegral $ ix ↪ 3)
+    f (split -> (pos, line)) = loop (↩ 1) (init ↩ 1) 0 .|. loop (↪ 1) (init ↪ 1) 0
+      where
+        init = 1 ↩ pos
+        loop f place acc
+          | (place .&. 63 == 0) = 0
+          | (place .&. line) == 0 = loop f (f place) (acc .|. place)
+          | otherwise = acc
 
-        r1 = place ↪ 1 .&. blank
-        r2 = r1 .|. r1 ↪ 1 .&. blank
-        r3 = r2 .|. r2 ↪ 1 .&. blank
-        r4 = r3 .|. r3 ↪ 1 .&. blank
-        r5 = r4 .|. r4 ↪ 1 .&. blank
-        r6 = r5 .|. r5 ↪ 1 .&. blank
-        r7 = if r6 .&. 1 == 0 then r6 else 0
+flipLine :: Int -> HemiBoard -> HemiBoard -> HemiBoard
+flipLine !intPos !blackLine !whiteLine = fromIntegral flipped
+  where
+    !outFlank = unsafeAt outFlankArray $ fromIntegral whiteLine ↩ 3 .|. intPos
+    !flipped  = unsafeAt flippedArray  $ fromIntegral (fromIntegral outFlank .&. blackLine) ↩ 3 .|. intPos
 
 
 -- TODO confirm the possibility of loop-unrolling by the compiler
@@ -187,15 +193,6 @@ admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) 
     dl7 = dl6 ↪ 7
 
 
-flipLine :: Int -> Line -> HemiLine
-flipLine !intPos (!black, !white) = inner `xor` mask
-  where
-    selector = intPos ↩ 8
-
-    !inner = unsafeAt lineArray $ selector .|. fromIntegral (complement white)
-    !outer = unsafeAt lineArray $ selector .|. fromIntegral black
-    !mask = unsafeAt lineArray $ selector .|. fromIntegral (inner `xor` outer)
-
 
 flipBoard :: BoardPos -> Board -> Board
 flipBoard !pos (!black, !white) = ((black `xor` flip) .|. 1 ↩ fromIntegral pos, white `xor` flip)
@@ -215,10 +212,10 @@ flipBoard !pos (!black, !white) = ((black `xor` flip) .|. 1 ↩ fromIntegral pos
     uldrMask = [b|1000000001000000001000000001000000001000000001000000001000000001|]
     urdlMask = [b|0000000100000010000001000000100000010000001000000100000010000000|]
 
-    toLRLine brd = fromIntegral $ brd ↪ (y ↩ 3) .&. 255
-    toUDLine brd = fromIntegral $ (((brd ↪ x) .&. udMask) * vertMul) ↪ 56
-    toULDRLine brd = fromIntegral $ (((brd ↺ (xyuldr ↩ 3)) .&. uldrMask) * diagMul) ↪ 56
-    toURDLLine brd = fromIntegral $ (((brd ↺ (xyurdl ↩ 3)) .&. urdlMask) * diagMul) ↪ 56
+    toLRLine brd = brd ↪ (y ↩ 3) .&. 255
+    toUDLine brd = (((brd ↪ x) .&. udMask) * vertMul) ↪ 56
+    toULDRLine brd = (((brd ↺ (xyuldr ↩ 3)) .&. uldrMask) * diagMul) ↪ 56
+    toURDLLine brd = (((brd ↺ (xyurdl ↩ 3)) .&. urdlMask) * diagMul) ↪ 56
 
     fromLRLine line = fromIntegral line ↩ (y ↩ 3)
     fromUDLine line = ((fromIntegral line * vertMul) .&. (udMask ↩ 7)) ↪ (7 - x)
@@ -229,10 +226,10 @@ flipBoard !pos (!black, !white) = ((black `xor` flip) .|. 1 ↩ fromIntegral pos
       where l = 254 ↩ pos
             r = r ↪ 1
 
-    lrFlip = fromLRLine $ flipLine x (toLRLine black, toLRLine white)
-    udFlip = fromUDLine $ flipLine y (toUDLine black, toUDLine white)
-    xyuldrFlip = fromULDRLine $ flipLine xyuldr (toULDRLine black, toULDRLine white .&. borderMask xyuldr)
-    xyurdlFlip = fromURDLLine $ flipLine xyurdl (toURDLLine black, toURDLLine white .&. borderMask xyurdl)
+    lrFlip = fromLRLine $ flipLine x (toLRLine black) (toLRLine white)
+    udFlip = fromUDLine $ flipLine y (toUDLine black) (toUDLine white)
+    xyuldrFlip = fromULDRLine $ flipLine xyuldr (toULDRLine black) (toULDRLine white .&. borderMask xyuldr)
+    xyurdlFlip = fromURDLLine $ flipLine xyurdl (toURDLLine black) (toURDLLine white .&. borderMask xyurdl)
 
     flip = (lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)
 
