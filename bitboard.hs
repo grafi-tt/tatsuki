@@ -205,10 +205,10 @@ flipBoard !pos (!black, !white) = ((black `xor` flip) .|. 1 ↩ fromIntegral pos
     y :: Int
     y = fromIntegral $ pos ↪ 3
 
-    xyuldr = x - y
+    xyuldr = y - x
     xyurdl = x + y - 7
 
-    vertMul = [b|0000000100000010000001000000100000010000001000000100000010000000|]
+    vertMul = [b|1000000001000000001000000001000000001000000001000000001000000001|]
     diagMul = [b|0000000100000001000000010000000100000001000000010000000100000001|]
 
     udMask = [b|0000000100000001000000010000000100000001000000010000000100000001|]
@@ -217,13 +217,13 @@ flipBoard !pos (!black, !white) = ((black `xor` flip) .|. 1 ↩ fromIntegral pos
 
     toLRLine brd = fromIntegral $ brd ↪ (y ↩ 3) .&. 255
     toUDLine brd = fromIntegral $ (((brd ↪ x) .&. udMask) * vertMul) ↪ 56
-    toULDRLine brd = fromIntegral $ (((brd ↻ (xyuldr ↩ 3)) .&. uldrMask) * diagMul) ↪ 56
+    toULDRLine brd = fromIntegral $ (((brd ↺ (xyuldr ↩ 3)) .&. uldrMask) * diagMul) ↪ 56
     toURDLLine brd = fromIntegral $ (((brd ↺ (xyurdl ↩ 3)) .&. urdlMask) * diagMul) ↪ 56
 
     fromLRLine line = fromIntegral line ↩ (y ↩ 3)
-    fromUDLine line = ((fromIntegral line .&. 127) * vertMul) ↪ (7 - x) .|. (fromIntegral line .&. 128) ↩ (49 + x)
-    fromULDRLine line = (fromIntegral line * diagMul) .&. uldrMask
-    fromURDLLine line = (fromIntegral line * diagMul) .&. urdlMask
+    fromUDLine line = ((fromIntegral line * vertMul) .&. (udMask ↩ 7)) ↪ (7 - x)
+    fromULDRLine line = ((fromIntegral line * diagMul) .&. uldrMask) ↩ (xyuldr ↩ 3)
+    fromURDLLine line = ((fromIntegral line * diagMul) .&. urdlMask) ↩ (xyurdl ↩ 3)
 
     borderMask pos = r .&. l
       where l = 254 ↩ pos
