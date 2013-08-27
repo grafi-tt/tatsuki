@@ -15,8 +15,8 @@ data MaxPQueue k v = Nil | Node Int k v (MaxPQueue k v) (MaxPQueue k v)
 
 -- public
 null :: MaxPQueue k v -> Bool
-null Nil = False
-null _   = True
+null Nil = True
+null _   = False
 
 empty :: MaxPQueue k v
 empty = Nil
