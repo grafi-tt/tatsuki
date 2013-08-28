@@ -40,10 +40,12 @@ instance IteratePos HemiBoard where
   nullPos _ = False
 
 instance IteratePos Board where
-  foldPos f acc = foldPos f acc . admissible
+  {-# INLINE foldPos #-}
+  foldPos f acc brd = foldPos f acc $ admissible brd
   nullPos = nullPos . admissible
 
 instance Ord k => IteratePos (MaxPQueue k BoardPos) where
+  {-# INLINE foldPos #-}
   foldPos f acc pq | null pq   = acc
                    | otherwise = let ((_, pos), pq') = deleteFindMax pq
                                  in  foldPos f (f pos acc) pq'
