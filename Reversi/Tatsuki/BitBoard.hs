@@ -53,9 +53,9 @@ instance Ord k => IteratePos (MaxPQueue k BoardPos) where
 infixl 8 ↩, ↪, ↻, ↺
 
 (↩) :: Bits a => a -> Int -> a
-(↩) = shiftL
+(↩) = unsafeShiftL
 (↪) :: Bits a => a -> Int -> a
-(↪) = shiftR
+(↪) = unsafeShiftR
 (↻) :: Bits a => a -> Int -> a
 (↻) = rotateL
 (↺) :: Bits a => a -> Int -> a
