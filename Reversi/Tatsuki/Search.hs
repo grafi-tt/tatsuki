@@ -11,12 +11,10 @@ import Data.Int
 import Data.IORef
 import Data.PQueue.Max
 import Reversi.Tatsuki.BitBoard
+import Reversi.Tatsuki.Search.Parameter
 import System.IO.Unsafe
 
 import Language.Literals.Binary
-
--- Parameters
-orderDepth = 3
 
 -- Global vars
 data SearchLog = SearchLog
@@ -45,19 +43,19 @@ maxScore :: Score
 maxScore = maxBound
 
 minScore :: Score
-minScore = (-maxBound)
+minScore = -maxScore
 
 evaluate :: Board -> IO Score
-evaluate board@(black, white) =
-  let !bCount = popCount black
-      !wCount = popCount white
+evaluate board@(pla, opp) =
+  let !bCount = popCount pla
+      !wCount = popCount opp
   in case (admissible &&& admissible . changeTurn) board of
     (0, 0) -> do
       -- TODO some logging here
       return $ case bCount `compare` wCount of
-        GT -> maxScore
+        GT -> maxScore - 1
         EQ -> 0
-        LT -> minScore
+        LT -> minScore + 1
 
     (bAdm, wAdm) -> do
       -- TODO some logging here
@@ -71,15 +69,15 @@ evaluate board@(black, white) =
           !wAdmCount = popCount wAdm
           !diffAdmCount = bAdmCount - wAdmCount
 
-          !bCornerCount = countCorner black
-          !wCornerCount = countCorner white
+          !bCornerCount = countCorner pla
+          !wCornerCount = countCorner opp
           !diffCornerCount = bCornerCount - wCornerCount
 
           !parity = (allCount .&. 1) `unsafeShiftL` 1 - 1
 
       return . fromIntegral $
         if allCount >= 56 then
-          diffCornerCount `unsafeShiftL` 6 + diffAdmCount `unsafeShiftL` 3+ parity `unsafeShiftL`3 + diffCount
+          diffCornerCount `unsafeShiftL` 6 + diffAdmCount `unsafeShiftL` 3 + parity `unsafeShiftL` 3 + diffCount
         else
           diffCornerCount `unsafeShiftL` 6 + diffAdmCount `unsafeShiftL` 3 + parity
 
@@ -95,33 +93,28 @@ moveBoard Nothing board = board
 moveBoard (Just pos) board = flipBoard pos board
 
 
-orderEvaluate :: Board -> IO Score
-orderEvaluate board = (<$>) negate $ searchScore orderDepth minScore maxScore $ changeTurn board
+orderEvaluate :: Depth -> Board -> IO Score
+orderEvaluate depth board = (<$>) negate $ searchScore (shallowSearchDepth depth board) minScore maxScore $ changeTurn board
 
-order :: Board -> IO (MaxPQueue Score BoardPos)
-order board = foldPos f (return empty) board
+order :: Depth -> Board -> IO (MaxPQueue Score BoardPos)
+order depth board = foldPos f (return empty) board
   where
     f pos pqM = do
       pq <- pqM
-      score <- orderEvaluate $ flipBoard pos board
+      score <- orderEvaluate depth $ flipBoard pos board
       return $ insert score pos pq
 
 
 countCorner :: HemiBoard -> Int
 countCorner = fromIntegral . popCount . (.&. [b|1000000100000000000000000000000000000000000000000000000010000001|])
 
--- TODO adjust parameter
 findEdge :: Board -> IO Edge
-findEdge board = searchEdge depth board
-  where
-    depth = case popCount (admissible board) of
-      count | count >= 60 -> 64 - count
-            | otherwise   -> 2
+findEdge board = searchEdge (searchDepth board) board
 
-searchEdge :: Int -> Board -> IO Edge
+searchEdge :: Depth -> Board -> IO Edge
 searchEdge !depth !board = snd <$> searchGeneral depth minScore maxScore board
 
-searchScore :: Int -> Score -> Score -> Board -> IO Score
+searchScore :: Depth -> Score -> Score -> Board -> IO Score
 searchScore !depth !α !β !board =
   case depth of
     0 -> evaluate board
@@ -129,19 +122,20 @@ searchScore !depth !α !β !board =
 
 -- calling searchGeneral with depth <= 0 causes infinite searching and stack overflow!!
 -- TODO better type anotation, dealing with above problem
-searchGeneral :: Int -> Score -> Score -> Board -> IO (Score, Edge)
+searchGeneral :: Depth -> Score -> Score -> Board -> IO (Score, Edge)
 searchGeneral !depth !α !β !board
-  | depth <= orderDepth = putStrLn ("search start depth: " ++ show depth) *> search' board <* putStrLn ("search end depth: " ++ show depth)
-  | otherwise           = search' board
+  | determineOrdering depth board = search' =<< order depth board
+  | otherwise = search' board
   where
+    search' :: IteratePos t => t -> IO (Score, Edge)
     search' = foldEdge f $ return (minScore, Nothing)
     f edge seM = do
       se@(score, _) <- seM
       if score >= β then
         return se
       else
-        putStrLn (show edge) >> updateScore se <$> (( ,edge) <$> searchScore (depth-1) (-β) (-(max α score)) (changeTurn $ moveBoard edge board))
+        updateScore se <$> (( ,edge) . negate <$> searchScore (depth-1) (-β) (-(max α score)) (changeTurn $ moveBoard edge board))
 
 updateScore :: (Score, Edge) -> (Score, Edge) -> (Score, Edge)
-updateScore (score, edge) (score', edge') | score > score' = (score, edge)
-                                          | otherwise      = (score', edge')
+updateScore (score, edge) (score', edge') | score < score' = (score', edge')
+                                          | otherwise      = (score, edge)

@@ -1,4 +1,4 @@
-module Reversi.Client.Random (RandomClient, initRandom) where
+module Reversi.Client.Random (RandomClient, initRandom, initHarmony) where
 
 import Control.Applicative
 import Control.Monad
@@ -15,6 +15,11 @@ import Reversi.Command
 
 -- Client declaration
 newtype RandomClient = RandomClient Board
+
+initHarmony :: Int -> IO RandomClient
+initHarmony n = setStdGen (mkStdGen n) *> (RandomClient <$> initBoard)
+
+initRandom :: IO RandomClient
 initRandom = RandomClient <$> initBoard
 
 instance C.Client RandomClient where
