@@ -57,9 +57,9 @@ evaluate board@(black, white) =
     (0, 0) -> do
       -- TODO some logging here
       return $ case bCount `compare` wCount of
-        GT -> maxBound
+        GT -> maxScore
         EQ -> 0
-        LT -> -maxBound
+        LT -> minScore
 
     (bAdm, wAdm) -> do
       -- TODO some logging here
@@ -116,15 +116,20 @@ findEdge :: Board -> IO Edge
 findEdge board = searchEdge depth board
   where
     depth = case popCount (admissible board) of
-      count | count >= 50 -> 64 - count
-            | otherwise   -> 8
+      count | count >= 60 -> 64 - count
+            | otherwise   -> 2
 
 searchEdge :: Int -> Board -> IO Edge
 searchEdge !depth !board = snd <$> searchGeneral depth minScore maxScore board
 
 searchScore :: Int -> Score -> Score -> Board -> IO Score
-searchScore !depth !α !β !board = fst <$> searchGeneral depth α β board
+searchScore !depth !α !β !board =
+  case depth of
+    0 -> evaluate board
+    otherwise ->  fst <$> searchGeneral depth α β board
 
+-- calling searchGeneral with depth <= 0 causes infinite searching and stack overflow!!
+-- TODO better type anotation, dealing with above problem
 searchGeneral :: Int -> Score -> Score -> Board -> IO (Score, Edge)
 searchGeneral !depth !α !β !board
   | depth <= orderDepth = search' board
@@ -132,12 +137,12 @@ searchGeneral !depth !α !β !board
   where
     search' = foldEdge f $ return (minScore, Nothing)
     f edge seM = do
-      (score, edge) <- seM
+      (score, _) <- seM
       if score >= β then
         seM
       else
         updateScore <$> seM <*>  (( ,edge) <$> searchScore (depth-1) (-β) (-(max α score)) (changeTurn $ moveBoard edge board))
 
 updateScore :: (Score, Edge) -> (Score, Edge) -> (Score, Edge)
-updateScore (score, edge) (score', edge') | score < score' = (score, edge)
+updateScore (score, edge) (score', edge') | score > score' = (score, edge)
                                           | otherwise      = (score', edge')

@@ -103,10 +103,10 @@ flippedLineArray = listArray (0, 1095) $ fromIntegral . f <$> [0 .. 1095]
           | otherwise = acc
 
 flipLine :: Int -> HemiBoard -> HemiBoard -> HemiBoard
-flipLine !intPos !blackLine !whiteLine = fromIntegral flippedLine
+flipLine !intPos !plaLine !oppLine = fromIntegral flippedLine
   where
-    !outFlank    = unsafeAt outFlankArray    $ fromIntegral whiteLine ↩ 2 .&. 504 .|. intPos
-    !flippedLine = unsafeAt flippedLineArray $ fromIntegral (fromIntegral outFlank .&. blackLine) ↩ 3 .|. intPos
+    !outFlank    = unsafeAt outFlankArray    $ fromIntegral oppLine ↩ 2 .&. 504 .|. intPos
+    !flippedLine = unsafeAt flippedLineArray $ fromIntegral (fromIntegral outFlank .&. plaLine) ↩ 3 .|. intPos
 
 
 -- TODO confirm the possibility of loop-unrolling by the compiler
@@ -118,88 +118,88 @@ initialBoard =
   )
 
 admissible :: Board -> HemiBoard
-admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) .|. (dl7 .|. dr7))) .&. blank
+admissible (!pla, !opp) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) .|. (dl7 .|. dr7))) .&. blank
   where
-    blank = complement (black .|. white)
+    blank = complement (pla .|. opp)
     lrMask = [b|0111111001111110011111100111111001111110011111100111111001111110|]
 
-    lrw = lrMask .&. white
+    opp' = lrMask .&. opp
 
-    l1 = black ↩ 1 .&. lrw
-    l2 = l1 .|. l1 ↩ 1 .&. lrw
-    l3 = l2 .|. l2 ↩ 1 .&. lrw
-    l4 = l3 .|. l3 ↩ 1 .&. lrw
-    l5 = l4 .|. l4 ↩ 1 .&. lrw
-    l6 = l5 .|. l5 ↩ 1 .&. lrw
+    l1 = pla ↩ 1 .&. opp'
+    l2 = l1 .|. l1 ↩ 1 .&. opp'
+    l3 = l2 .|. l2 ↩ 1 .&. opp'
+    l4 = l3 .|. l3 ↩ 1 .&. opp'
+    l5 = l4 .|. l4 ↩ 1 .&. opp'
+    l6 = l5 .|. l5 ↩ 1 .&. opp'
     l7 = l6 ↩ 1
 
-    r1 = black ↪ 1 .&. lrw
-    r2 = r1 .|. r1 ↪ 1 .&. lrw
-    r3 = r2 .|. r2 ↪ 1 .&. lrw
-    r4 = r3 .|. r3 ↪ 1 .&. lrw
-    r5 = r4 .|. r4 ↪ 1 .&. lrw
-    r6 = r5 .|. r5 ↪ 1 .&. lrw
+    r1 = pla ↪ 1 .&. opp'
+    r2 = r1 .|. r1 ↪ 1 .&. opp'
+    r3 = r2 .|. r2 ↪ 1 .&. opp'
+    r4 = r3 .|. r3 ↪ 1 .&. opp'
+    r5 = r4 .|. r4 ↪ 1 .&. opp'
+    r6 = r5 .|. r5 ↪ 1 .&. opp'
     r7 = r6 ↪ 1
 
 
-    u1 = black ↩ 8 .&. white
-    u2 = u1 .|. u1 ↩ 8 .&. white
-    u3 = u2 .|. u2 ↩ 8 .&. white
-    u4 = u3 .|. u3 ↩ 8 .&. white
-    u5 = u4 .|. u4 ↩ 8 .&. white
-    u6 = u5 .|. u5 ↩ 8 .&. white
+    u1 = pla ↩ 8 .&. opp
+    u2 = u1 .|. u1 ↩ 8 .&. opp
+    u3 = u2 .|. u2 ↩ 8 .&. opp
+    u4 = u3 .|. u3 ↩ 8 .&. opp
+    u5 = u4 .|. u4 ↩ 8 .&. opp
+    u6 = u5 .|. u5 ↩ 8 .&. opp
     u7 = u6 ↩ 8
 
-    d1 = black ↪ 8 .&. white
-    d2 = d1 .|. d1 ↪ 8 .&. white
-    d3 = d2 .|. d2 ↪ 8 .&. white
-    d4 = d3 .|. d3 ↪ 8 .&. white
-    d5 = d4 .|. d4 ↪ 8 .&. white
-    d6 = d5 .|. d5 ↪ 8 .&. white
+    d1 = pla ↪ 8 .&. opp
+    d2 = d1 .|. d1 ↪ 8 .&. opp
+    d3 = d2 .|. d2 ↪ 8 .&. opp
+    d4 = d3 .|. d3 ↪ 8 .&. opp
+    d5 = d4 .|. d4 ↪ 8 .&. opp
+    d6 = d5 .|. d5 ↪ 8 .&. opp
     d7 = d6 ↪ 8
 
 
-    ul1 = black ↩ 9 .&. lrw
-    ul2 = ul1 .|. ul1 ↩ 9 .&. lrw
-    ul3 = ul2 .|. ul2 ↩ 9 .&. lrw
-    ul4 = ul3 .|. ul3 ↩ 9 .&. lrw
-    ul5 = ul4 .|. ul4 ↩ 9 .&. lrw
-    ul6 = ul5 .|. ul5 ↩ 9 .&. lrw
+    ul1 = pla ↩ 9 .&. opp'
+    ul2 = ul1 .|. ul1 ↩ 9 .&. opp'
+    ul3 = ul2 .|. ul2 ↩ 9 .&. opp'
+    ul4 = ul3 .|. ul3 ↩ 9 .&. opp'
+    ul5 = ul4 .|. ul4 ↩ 9 .&. opp'
+    ul6 = ul5 .|. ul5 ↩ 9 .&. opp'
     ul7 = ul6 ↩ 9
 
-    dr1 = black ↪ 9 .&. lrw
-    dr2 = dr1 .|. dr1 ↪ 9 .&. lrw
-    dr3 = dr2 .|. dr2 ↪ 9 .&. lrw
-    dr4 = dr3 .|. dr3 ↪ 9 .&. lrw
-    dr5 = dr4 .|. dr4 ↪ 9 .&. lrw
-    dr6 = dr5 .|. dr5 ↪ 9 .&. lrw
+    dr1 = pla ↪ 9 .&. opp'
+    dr2 = dr1 .|. dr1 ↪ 9 .&. opp'
+    dr3 = dr2 .|. dr2 ↪ 9 .&. opp'
+    dr4 = dr3 .|. dr3 ↪ 9 .&. opp'
+    dr5 = dr4 .|. dr4 ↪ 9 .&. opp'
+    dr6 = dr5 .|. dr5 ↪ 9 .&. opp'
     dr7 = dr6 ↪ 9
 
 
-    ur1 = black ↩ 7 .&. lrw
-    ur2 = ur1 .|. ur1 ↩ 7 .&. lrw
-    ur3 = ur2 .|. ur2 ↩ 7 .&. lrw
-    ur4 = ur3 .|. ur3 ↩ 7 .&. lrw
-    ur5 = ur4 .|. ur4 ↩ 7 .&. lrw
-    ur6 = ur5 .|. ur5 ↩ 7 .&. lrw
+    ur1 = pla ↩ 7 .&. opp'
+    ur2 = ur1 .|. ur1 ↩ 7 .&. opp'
+    ur3 = ur2 .|. ur2 ↩ 7 .&. opp'
+    ur4 = ur3 .|. ur3 ↩ 7 .&. opp'
+    ur5 = ur4 .|. ur4 ↩ 7 .&. opp'
+    ur6 = ur5 .|. ur5 ↩ 7 .&. opp'
     ur7 = ur6 ↩ 7
 
-    dl1 = black ↪ 7 .&. lrw
-    dl2 = dl1 .|. dl1 ↪ 7 .&. lrw
-    dl3 = dl2 .|. dl2 ↪ 7 .&. lrw
-    dl4 = dl3 .|. dl3 ↪ 7 .&. lrw
-    dl5 = dl4 .|. dl4 ↪ 7 .&. lrw
-    dl6 = dl5 .|. dl5 ↪ 7 .&. lrw
+    dl1 = pla ↪ 7 .&. opp'
+    dl2 = dl1 .|. dl1 ↪ 7 .&. opp'
+    dl3 = dl2 .|. dl2 ↪ 7 .&. opp'
+    dl4 = dl3 .|. dl3 ↪ 7 .&. opp'
+    dl5 = dl4 .|. dl4 ↪ 7 .&. opp'
+    dl6 = dl5 .|. dl5 ↪ 7 .&. opp'
     dl7 = dl6 ↪ 7
 
 
 flipBoard :: BoardPos -> Board -> Board
-flipBoard !pos (!black, !white) = ((black `xor` fl) .|. 1 ↩ fromIntegral pos, white `xor` fl)
-  where fl = flipped pos (black, white)
+flipBoard !pos (!pla, !opp) = ((pla `xor` fl) .|. 1 ↩ fromIntegral pos, opp `xor` fl)
+  where fl = flipped pos (pla, opp)
 
 flipped :: BoardPos -> Board -> HemiBoard
-flipped !pos (!black, !white) = (lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)
---flipped !pos (!black, !white) = ((lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)) .&. 0 .|. xyurdlFlip
+flipped !pos (!pla, !opp) = (lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)
+--flipped !pos (!pla, !opp) = ((lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)) .&. 0 .|. xyurdlFlip
   where
     x = pos .&. 7
     y = pos ↪ 3
@@ -226,10 +226,10 @@ flipped !pos (!black, !white) = (lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFl
     fromULDRLine line = ((line * diagMul) .&. uldrMask) ↻ (xyuldr ↩ 3)
     fromURDLLine line = ((line * diagMul) .&. urdlMask) ↻ (xyurdl ↩ 3)
 
-    lrFlip = fromLRLine $ flipLine x (toLRLine black) (toLRLine white)
-    udFlip = fromUDLine $ flipLine (7-y) (toUDLine black) (toUDLine white)
-    xyuldrFlip = fromULDRLine $ flipLine x (toULDRLine black) (toULDRLine white .&. diagBorderMask ↺ xyuldr)
-    xyurdlFlip = fromURDLLine $ flipLine x (toURDLLine black) (toURDLLine white .&. diagBorderMask ↻ xyurdl)
+    lrFlip = fromLRLine $ flipLine x (toLRLine pla) (toLRLine opp)
+    udFlip = fromUDLine $ flipLine (7-y) (toUDLine pla) (toUDLine opp)
+    xyuldrFlip = fromULDRLine $ flipLine x (toULDRLine pla) (toULDRLine opp .&. diagBorderMask ↺ xyuldr)
+    xyurdlFlip = fromURDLLine $ flipLine x (toURDLLine pla) (toURDLLine opp .&. diagBorderMask ↻ xyurdl)
 
 changeTurn :: Board -> Board
 changeTurn (bk, wt) = (wt, bk)

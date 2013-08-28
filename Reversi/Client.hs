@@ -1,7 +1,6 @@
 -- this file is based on the internally distributed sample implementation
 module Reversi.Client
   ( Client
-  , initialize
   , doMove
   , play
   , putInfo
@@ -16,31 +15,32 @@ import Reversi.Color
 import Reversi.Command
 
 class Client c where
-  initialize :: IO c
   doMove :: c -> Mv -> Color -> IO c
   play :: c -> Color -> IO Mv
   putInfo :: c -> IO () -- not good
 
 -- State Machine
-doGame :: Client c => Handle -> c -> String -> Bool -> IO ()
-doGame h client plname verbose = do
+-- TODO use ReaderT
+doGame :: Client c => Handle -> IO c -> String -> Bool -> IO ()
+doGame h init plname verbose = do
   hPutCommand h $ Open plname
-  waitStart h client plname verbose
+  waitStart h init plname verbose
 
-waitStart :: Client c => Handle -> c -> String -> Bool -> IO ()
-waitStart h client plname verbose = do
+waitStart :: Client c => Handle -> IO c -> String -> Bool -> IO ()
+waitStart h init plname verbose = do
+  client <- init
   c <- hGetCommand' h
   case c of
    Bye scores -> putStrLn $ showScores scores
    Start color opname mytime -> do
      if color == black then
-       performMyMove h client color [] (plname, opname) mytime verbose
+       performMyMove h init client color [] (plname, opname) mytime verbose
      else
-       waitOpponentMove h client color [] (plname, opname) mytime verbose
+       waitOpponentMove h init client color [] (plname, opname) mytime verbose
    _ -> error $ "Invalid Command: " ++ show c
 
-performMyMove :: Client c => Handle -> c -> Color -> Hist -> (String, String) -> Int -> Bool -> IO ()
-performMyMove h client color hist names mytime verbose = do
+performMyMove :: Client c => Handle -> IO c -> c -> Color -> Hist -> (String, String) -> Int -> Bool -> IO ()
+performMyMove h init client color hist names mytime verbose = do
   pmove <- play client color
   client <- doMove client pmove color
   hPutCommand h $ Move pmove
@@ -50,14 +50,14 @@ performMyMove h client color hist names mytime verbose = do
   c <- hGetCommand' h
   case c of
     Ack mytime' ->
-      waitOpponentMove h client color (PMove pmove:hist) names mytime' verbose
+      waitOpponentMove h init client color (PMove pmove:hist) names mytime' verbose
     End wl n m r ->
-      procEnd h client color hist names wl n m r verbose
+      procEnd h init client color hist names wl n m r verbose
     _ ->
       error $ "Invalid Command: " ++ show c
 
-waitOpponentMove :: Client c => Handle -> c -> Color -> Hist -> (String, String) -> Int -> Bool -> IO ()
-waitOpponentMove h client color hist names mytime verbose = do
+waitOpponentMove :: Client c => Handle -> IO c -> c -> Color -> Hist -> (String, String) -> Int -> Bool -> IO ()
+waitOpponentMove h init client color hist names mytime verbose = do
   c <- hGetCommand' h
   case c of
     Move omove -> do
@@ -65,14 +65,14 @@ waitOpponentMove h client color hist names mytime verbose = do
       when verbose $ putStrLn $ replicate 80 '-'
       when verbose $ putStrLn ("OMove: " ++ show omove ++ " " ++ showColor color)
       when verbose (putInfo client)
-      performMyMove h client color (OMove omove:hist) names mytime verbose
+      performMyMove h init client color (OMove omove:hist) names mytime verbose
     End wl n m r ->
-      procEnd h client color hist names wl n m r verbose
+      procEnd h init client color hist names wl n m r verbose
     _ ->
       error $ "Invalid Command: " ++ show c
 
-procEnd :: Client c => Handle -> c -> Color -> Hist -> (String, String) -> WL -> Int -> Int -> String -> Bool -> IO ()
-procEnd h client color hist (plname, opname) wl n m r verbose = do
+procEnd :: Client c => Handle -> IO c -> c -> Color -> Hist -> (String, String) -> WL -> Int -> Int -> String -> Bool -> IO ()
+procEnd h init client color hist (plname, opname) wl n m r verbose = do
   case wl of
     Win ->
       putStrLn $ printf "You win! (%d vs. %d) -- %s." n m r
@@ -86,7 +86,7 @@ procEnd h client color hist (plname, opname) wl n m r verbose = do
 
   putInfo $ client
   putStrLn $ showHist hist
-  waitStart h client plname verbose
+  waitStart h init plname verbose
 
 -- History
 data OPMove = OMove Mv | PMove Mv

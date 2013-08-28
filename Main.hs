@@ -63,5 +63,4 @@ runClient conf = do
   putStrLn $ "Connecting to " ++ (host conf) ++ " " ++ show (port conf)
   !h <- connectTo (host conf) (PortNumber $ port conf)
   putStrLn $ "Connection Ok."
-  client <- (initialize :: IO ClientImp)
-  doGame h client (playerName conf) (verbose conf)
+  doGame h initClient (playerName conf) (verbose conf)

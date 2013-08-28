@@ -1,4 +1,4 @@
-module Reversi.Client.Tatsuki (TatsukiClient) where
+module Reversi.Client.Tatsuki (TatsukiClient, initTatsuki) where
 
 import Control.Applicative
 import Data.Bits
@@ -6,11 +6,12 @@ import Reversi.Tatsuki
 import Reversi.Command
 import Reversi.Client
 
+initTatsuki = resetSearchLog >> return (TatsukiClient initialBoard)
+
 newtype TatsukiClient = TatsukiClient Board
 instance Client TatsukiClient where
-  initialize =  resetSearchLog >> return (TatsukiClient initialBoard)
   play (TatsukiClient board) _ = edgeToMv <$> findEdge board
-  doMove (TatsukiClient board) mv _ = return $ TatsukiClient $ moveBoard (mvToEdge mv) board
+  doMove (TatsukiClient board) mv _ = return $ TatsukiClient $ changeTurn $ moveBoard (mvToEdge mv) board
   putInfo (TatsukiClient board) = putStrLn "hoge"
 
 edgeToMv :: Edge -> Mv
