@@ -4,20 +4,22 @@ import Data.Bits
 import Data.Word
 
 admissible :: (Word64, Word64) -> Word64
-admissible brd = foldr f 0 [0..63]
+admissible brd@(pla, opp) = foldr f 0 [0..63]
   where
-    f pos acc | flipped brd pos == 0 = acc
+    f pos acc | (pla .|. opp) .&. 1 `shiftL` pos /= 0 = acc
+              | flipped pos brd == 0 = acc
               | otherwise = acc .|. 1 `shiftL` pos
 
-flipped :: (Word64, Word64) -> Int -> Word64
-flipped (pla, opp) pos = foldr (.|.) 0 $ map flipped' dirs
+flipped :: Int -> (Word64, Word64) -> Word64
+flipped pos (pla, opp) = foldr (.|.) 0 $ map flipped' dirs
   where
     dirs = [(x, y) | x <- [-1,0,1], y <- [-1,0,1], not (x == 0 && y == 0)]
     flipped' (dx, dy) =
-      let loop acc p@(x, y) | overflow p = 0
-                            | check pla p = acc
-                            | check opp p = loop (acc .|. place p) (x+dx, y+dy)
-                            | otherwise = 0
+      let loop acc (x, y) | overflow p' = 0
+                          | check pla p' = acc
+                          | check opp p' = loop (acc .|. place p') p'
+                          | otherwise = 0
+            where p' = (x+dx, y+dy)
       in loop 0 (posx, posy)
 
     posx = pos .&. 7

@@ -53,9 +53,9 @@ instance Ord k => IteratePos (MaxPQueue k BoardPos) where
 infixl 8 ↩, ↪, ↻, ↺
 
 (↩) :: Bits a => a -> Int -> a
-(↩) = unsafeShiftL
+(↩) = shiftL
 (↪) :: Bits a => a -> Int -> a
-(↪) = unsafeShiftR
+(↪) = shiftR
 (↻) :: Bits a => a -> Int -> a
 (↻) = rotateL
 (↺) :: Bits a => a -> Int -> a
@@ -76,38 +76,41 @@ LSB first
 -}
 
 outFlankArray :: UArray Int Line
-outFlankArray = listArray (0, 511) $ f <$> [0 .. 511]
+outFlankArray = listArray (0, 511) $ fromIntegral . f <$> [0 .. 511]
   where
     split ix = (ix .&. 7, (fromIntegral $ ix ↪ 3) ↩ 1)
+    f :: Int -> BoardPos
     f (split -> (pos, line)) = loop (↩ 1) (init ↩ 1) False .|. loop (↪ 1) (init ↪ 1) False
       where
         init = 1 ↩ pos
         loop f place ok
-          | (place .&. 63 == 0) = 0
+          | (place .&. 255 == 0) = 0
           | (place .&. line) /= 0 = loop f (f place) True
           | ok = place
           | otherwise = 0
 
-flippedArray :: UArray Int Line
-flippedArray = listArray (0, 136) $ f <$> [0 .. 136]
+flippedLineArray :: UArray Int Line
+flippedLineArray = listArray (0, 1095) $ fromIntegral . f <$> [0 .. 1095]
   where
     split ix = (ix .&. 7, fromIntegral $ ix ↪ 3)
+    f :: Int -> BoardPos
     f (split -> (pos, line)) = loop (↩ 1) (init ↩ 1) 0 .|. loop (↪ 1) (init ↪ 1) 0
       where
         init = 1 ↩ pos
         loop f place acc
-          | (place .&. 63 == 0) = 0
+          | (place .&. 255 == 0) = 0
           | (place .&. line) == 0 = loop f (f place) (acc .|. place)
           | otherwise = acc
 
 flipLine :: Int -> HemiBoard -> HemiBoard -> HemiBoard
-flipLine !intPos !blackLine !whiteLine = fromIntegral flipped
+flipLine !intPos !blackLine !whiteLine = fromIntegral flippedLine
   where
-    !outFlank = unsafeAt outFlankArray $ fromIntegral whiteLine ↩ 3 .|. intPos
-    !flipped  = unsafeAt flippedArray  $ fromIntegral (fromIntegral outFlank .&. blackLine) ↩ 3 .|. intPos
+    !outFlank    = unsafeAt outFlankArray    $ fromIntegral whiteLine ↩ 2 .&. 504 .|. intPos
+    !flippedLine = unsafeAt flippedLineArray $ fromIntegral (fromIntegral outFlank .&. blackLine) ↩ 3 .|. intPos
 
 
 -- TODO confirm the possibility of loop-unrolling by the compiler
+-- TODO move common subexpression into function, which will be inlined by the compiler and generate same code
 initialBoard :: Board
 initialBoard =
   ( [b|0000000000000000000000000000100000010000000000000000000000000000|]
@@ -139,7 +142,7 @@ admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) 
     r7 = r6 ↪ 1
 
 
-    u1 = black ↩ 8
+    u1 = black ↩ 8 .&. white
     u2 = u1 .|. u1 ↩ 8 .&. white
     u3 = u2 .|. u2 ↩ 8 .&. white
     u4 = u3 .|. u3 ↩ 8 .&. white
@@ -147,7 +150,7 @@ admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) 
     u6 = u5 .|. u5 ↩ 8 .&. white
     u7 = u6 ↩ 8
 
-    d1 = black ↪ 8
+    d1 = black ↪ 8 .&. white
     d2 = d1 .|. d1 ↪ 8 .&. white
     d3 = d2 .|. d2 ↪ 8 .&. white
     d4 = d3 .|. d3 ↪ 8 .&. white
@@ -156,7 +159,7 @@ admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) 
     d7 = d6 ↪ 8
 
 
-    ul1 = black ↩ 9
+    ul1 = black ↩ 9 .&. lrw
     ul2 = ul1 .|. ul1 ↩ 9 .&. lrw
     ul3 = ul2 .|. ul2 ↩ 9 .&. lrw
     ul4 = ul3 .|. ul3 ↩ 9 .&. lrw
@@ -164,7 +167,7 @@ admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) 
     ul6 = ul5 .|. ul5 ↩ 9 .&. lrw
     ul7 = ul6 ↩ 9
 
-    dr1 = black ↪ 9
+    dr1 = black ↪ 9 .&. lrw
     dr2 = dr1 .|. dr1 ↪ 9 .&. lrw
     dr3 = dr2 .|. dr2 ↪ 9 .&. lrw
     dr4 = dr3 .|. dr3 ↪ 9 .&. lrw
@@ -173,7 +176,7 @@ admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) 
     dr7 = dr6 ↪ 9
 
 
-    ur1 = black ↩ 7
+    ur1 = black ↩ 7 .&. lrw
     ur2 = ur1 .|. ur1 ↩ 7 .&. lrw
     ur3 = ur2 .|. ur2 ↩ 7 .&. lrw
     ur4 = ur3 .|. ur3 ↩ 7 .&. lrw
@@ -181,7 +184,7 @@ admissible (!black, !white) = (((l7 .|. r7) .|. (u7 .|. d7)) .|. ((ul7 .|. ur7) 
     ur6 = ur5 .|. ur5 ↩ 7 .&. lrw
     ur7 = ur6 ↩ 7
 
-    dl1 = black ↪ 7
+    dl1 = black ↪ 7 .&. lrw
     dl2 = dl1 .|. dl1 ↪ 7 .&. lrw
     dl3 = dl2 .|. dl2 ↪ 7 .&. lrw
     dl4 = dl3 .|. dl3 ↪ 7 .&. lrw
@@ -196,12 +199,13 @@ flipBoard !pos (!black, !white) = ((black `xor` fl) .|. 1 ↩ fromIntegral pos, 
 
 flipped :: BoardPos -> Board -> HemiBoard
 flipped !pos (!black, !white) = (lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)
+--flipped !pos (!black, !white) = ((lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFlip)) .&. 0 .|. xyurdlFlip
   where
     x = pos .&. 7
     y = pos ↪ 3
 
-    xyuldr = y - x
-    xyurdl = x + y - 7
+    xyuldr = (y - x) .&. 7
+    xyurdl = (x + y - 7) .&. 7
 
     vertMul = [b|1000000001000000001000000001000000001000000001000000001000000001|]
     diagMul = [b|0000000100000001000000010000000100000001000000010000000100000001|]
@@ -210,24 +214,22 @@ flipped !pos (!black, !white) = (lrFlip .|. udFlip) .|. (xyuldrFlip .|. xyurdlFl
     uldrMask = [b|1000000001000000001000000001000000001000000001000000001000000001|]
     urdlMask = [b|0000000100000010000001000000100000010000001000000100000010000000|]
 
+    diagBorderMask = [b|0111111001111110011111100111111001111110011111100111111001111110|]
+
     toLRLine brd = brd ↪ (y ↩ 3) .&. 255
     toUDLine brd = (((brd ↪ x) .&. udMask) * vertMul) ↪ 56
     toULDRLine brd = (((brd ↺ (xyuldr ↩ 3)) .&. uldrMask) * diagMul) ↪ 56
     toURDLLine brd = (((brd ↺ (xyurdl ↩ 3)) .&. urdlMask) * diagMul) ↪ 56
 
     fromLRLine line = fromIntegral line ↩ (y ↩ 3)
-    fromUDLine line = ((fromIntegral line * vertMul) .&. (udMask ↩ 7)) ↪ (7 - x)
-    fromULDRLine line = ((fromIntegral line * diagMul) .&. uldrMask) ↩ (xyuldr ↩ 3)
-    fromURDLLine line = ((fromIntegral line * diagMul) .&. urdlMask) ↩ (xyurdl ↩ 3)
-
-    borderMask pos = r .&. l
-      where l = 254 ↩ pos
-            r = r ↪ 1
+    fromUDLine line = ((line * vertMul) .&. (udMask ↩ 7)) ↪ (7 - x)
+    fromULDRLine line = ((line * diagMul) .&. uldrMask) ↻ (xyuldr ↩ 3)
+    fromURDLLine line = ((line * diagMul) .&. urdlMask) ↻ (xyurdl ↩ 3)
 
     lrFlip = fromLRLine $ flipLine x (toLRLine black) (toLRLine white)
-    udFlip = fromUDLine $ flipLine y (toUDLine black) (toUDLine white)
-    xyuldrFlip = fromULDRLine $ flipLine xyuldr (toULDRLine black) (toULDRLine white .&. borderMask xyuldr)
-    xyurdlFlip = fromURDLLine $ flipLine xyurdl (toURDLLine black) (toURDLLine white .&. borderMask xyurdl)
+    udFlip = fromUDLine $ flipLine (7-y) (toUDLine black) (toUDLine white)
+    xyuldrFlip = fromULDRLine $ flipLine x (toULDRLine black) (toULDRLine white .&. diagBorderMask ↺ xyuldr)
+    xyurdlFlip = fromURDLLine $ flipLine x (toURDLLine black) (toURDLLine white .&. diagBorderMask ↻ xyurdl)
 
 changeTurn :: Board -> Board
 changeTurn (bk, wt) = (wt, bk)
