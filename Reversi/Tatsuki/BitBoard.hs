@@ -31,8 +31,6 @@ class IteratePos t where
 -- TODO used these func instead of explicit recursion
 {-
 instance IteratePos HemiBoard where
-  -- if f is strict for it's argument, no boxing needed (while it's probably notorious premature optimization, and I don't even complehend behavior in conjunction with foldEdge...)
-  {-# INLINE foldPosTill #-}
   foldPosTill _ _ !acc 0 = acc
   foldPosTill f g !acc !tmp
     | nullPos tmp || g acc = acc
@@ -44,12 +42,10 @@ instance IteratePos HemiBoard where
   nullPos _ = False
 
 instance IteratePos Board where
-  {-# INLINE foldPosTill #-}
   foldPosTill f g acc brd = foldPosTill f g acc $ admissible brd
   nullPos = nullPos . admissible
 
 instance Ord k => IteratePos (MaxPQueue k BoardPos) where
-  {-# INLINE foldPosTill #-}
   foldPosTill f g acc pq
     | nullPos pq || g acc = acc
     | otherwise = let ((_, pos), pq') = deleteFindMax pq
@@ -111,6 +107,7 @@ flippedLineArray = listArray (0, 1095) $ fromIntegral . f <$> [0 .. 1095]
           | otherwise = acc
 
 flipLine :: Int -> HemiBoard -> HemiBoard -> HemiBoard
+{-# INLINE flipLine #-}
 flipLine !intPos !plaLine !oppLine = fromIntegral flippedLine
   where
     !outFlank    = unsafeAt outFlankArray    $ fromIntegral oppLine ↩ 2 .&. 504 .|. intPos

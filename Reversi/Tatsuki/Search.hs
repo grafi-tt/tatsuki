@@ -71,7 +71,8 @@ moveBoard Nothing board = board
 moveBoard (Just pos) board = flipBoard pos board
 
 
-order :: (Board -> IO Score) -> Depth -> Board -> IO (MaxPQueue Score BoardPos)
+order :: EvalSel -> Depth -> Board -> IO (MaxPQueue Score BoardPos)
+{-# INLINE order #-}
 order eval orderDepth board = loop empty $ admissible board
   where
     loop pq !adm
@@ -80,8 +81,10 @@ order eval orderDepth board = loop empty $ admissible board
         let lso = adm .&. (-adm)
             adm' = adm - lso
             !pos = fromIntegral $ popCount (lso - 1)
-        score <- (<$>) negate $ searchScore eval orderDepth minScore maxScore $ changeTurn $ flipBoard pos board
+        score <- (<$>) negate $ searchScore eval (orderDepth-1) minScore (-(findMaxScore pq)) $ changeTurn $ flipBoard pos board
         loop (insert score pos pq) adm'
+    findMaxScore pq | null pq = minScore
+                    | otherwise = fst $ findMax pq
 
 findEdge :: Board -> IO Edge
 findEdge board@(pla, opp) = do
@@ -96,44 +99,58 @@ findEdge board@(pla, opp) = do
 searchEdge :: Depth -> Board -> IO Edge
 searchEdge !depth !board
   | admissible board == 0 = return Nothing
-  | otherwise = Just . snd <$> searchGeneral evaluate depth minScore maxScore board
+  | otherwise = Just . snd <$> searchGeneral tagEvaluate depth minScore maxScore board
 
-searchScore :: (Board -> IO Score) -> Depth -> Score -> Score -> Board -> IO Score
+searchScore :: EvalSel -> Depth -> Score -> Score -> Board -> IO Score
 searchScore eval !depth !α !β !board@(pla, opp) =
-  case (admissible board, admissible $ changeTurn board, depth) of
-    (0, 0, _) ->
-      return $ case popCount pla `compare` popCount opp of
-        GT -> maxScore - 1
-        EQ -> 0
-        LT -> minScore + 1
-    (_, _, 0) -> eval board
-    (0, _, 1) -> negate <$> eval (changeTurn board)
-    (0, _, _) -> negate <$> fst <$> searchGeneral eval (depth-1) (-β) (-α) (changeTurn board)
-    _ -> fst <$> searchGeneral eval depth α β board
+  case (popCount pla, popCount opp) of
+    (plaCnt, oppCnt)
+      | plaCnt + oppCnt == 63 ->
+        case flipBoard (popCount (complement (pla .|. opp) - 1)) board of
+          (opp', pla') ->
+            return $ case popCount pla' `compare` popCount opp' of
+              GT -> maxScore - 1
+              EQ -> 0
+              LT -> minScore + 1
+      | otherwise ->
+        case (admissible board, admissible $ changeTurn board, depth) of
+          (0, 0, _) ->
+            return $ case plaCnt `compare` oppCnt of
+              GT -> maxScore - 1
+              EQ -> 0
+              LT -> minScore + 1
+          (_, _, 0) -> getActualEval eval board
+          (0, _, 1) -> negate <$> getActualEval eval (changeTurn board)
+          (0, _, _) -> negate <$> fst <$> searchGeneral eval depth (-β) (-α) (changeTurn board)
+          _ -> fst <$> searchGeneral eval depth α β board
 
 -- calling searchGeneral with depth <= 0 causes infinite searching and stack overflow!!
 -- TODO better type anotation, dealing with above problem
-searchGeneral :: (Board -> IO Score) -> Depth -> Score -> Score -> Board -> IO (Score, BoardPos)
+searchGeneral :: EvalSel -> Depth -> Score -> Score -> Board -> IO (Score, BoardPos)
+{-# INLINE searchGeneral #-}
 searchGeneral eval !depth !α !β !board =
   case getOrderDepth depth board of
-    0 -> searchAdmissible (minScore, 0) $ admissible board
-    orderDepth -> searchOrdered (minScore, 0) =<< order (getOrderEval depth board) orderDepth board
+    orderDepth
+      | orderDepth > 0 -> searchOrdered (minScore, 0) =<< order (getOrderEval depth board) orderDepth board
+      | otherwise -> searchAdmissible (minScore, 0) $ admissible board
   where
     searchAdmissible sp@(score, _) !adm
       | score >= β || adm == 0 = return sp
-      | otherwise = do
+      | otherwise =
         let lso = adm .&. (-adm)
             adm' = adm - lso
             !pos = fromIntegral $ popCount (lso - 1)
-        sp' <- ( ,pos) . negate <$> searchScore eval (depth-1) (-β) (-(max α score)) (changeTurn $ flipBoard pos board)
-        searchAdmissible (updateScore sp sp') adm'
+        in do
+            sp' <- ( ,pos) . negate <$> searchScore eval (127 .&. (depth-1)) (-β) (-(max α score)) (changeTurn $ flipBoard pos board)
+            searchAdmissible (updateScore sp sp') adm'
 
     searchOrdered sp@(score, _) pq
       | score >= β || null pq = return sp
-      | otherwise = do
+      | otherwise =
         let ((_, !pos), pq') = deleteFindMax pq
-        sp' <- ( ,pos) . negate <$> searchScore eval (depth-1) (-β) (-(max α score)) (changeTurn $ flipBoard pos board)
-        searchOrdered (updateScore sp sp') pq'
+        in do
+            sp' <- ( ,pos) . negate <$> searchScore eval (127 .&. (depth-1)) (-β) (-(max α score)) (changeTurn $ flipBoard pos board)
+            searchOrdered (updateScore sp sp') pq'
 
 updateScore :: (Score, BoardPos) -> (Score, BoardPos) -> (Score, BoardPos)
 updateScore (score, pos) (score', pos') | score < score' = (score', pos')
