@@ -24,32 +24,38 @@ type BoardPos = Int
 type Line = Word8
 
 class IteratePos t where
-  foldPos :: (BoardPos -> a -> a) -> a -> t -> a
+  foldPosTill :: (BoardPos -> a -> a) -> (BoardPos -> Bool) -> a -> t -> a
   nullPos :: t -> Bool -- It is a bit dirty, but needed for efficient handling of pass, which I cannot handle efficiently only with fodling.
 
+-- not used because of hand inlining
+-- TODO used these func instead of explicit recursion
+{-
 instance IteratePos HemiBoard where
   -- if f is strict for it's argument, no boxing needed (while it's probably notorious premature optimization, and I don't even complehend behavior in conjunction with foldEdge...)
-  {-# INLINE foldPos #-}
-  foldPos _ !acc 0 = acc
-  foldPos f !acc !tmp =
-    let !lso = tmp .&. (-tmp)
-        !tmp' = tmp - lso
-        !pos = fromIntegral $ popCount (lso - 1)
-    in  foldPos f (f pos acc) tmp'
+  {-# INLINE foldPosTill #-}
+  foldPosTill _ _ !acc 0 = acc
+  foldPosTill f g !acc !tmp
+    | nullPos tmp || g acc = acc
+    | otherwise = let !lso = tmp .&. (-tmp)
+                      !tmp' = tmp - lso
+                      !pos = fromIntegral $ popCount (lso - 1)
+                  in  foldPosTill f g (f pos acc) tmp'
   nullPos 0 = True
   nullPos _ = False
 
 instance IteratePos Board where
-  {-# INLINE foldPos #-}
-  foldPos f acc brd = foldPos f acc $ admissible brd
+  {-# INLINE foldPosTill #-}
+  foldPosTill f g acc brd = foldPosTill f g acc $ admissible brd
   nullPos = nullPos . admissible
 
 instance Ord k => IteratePos (MaxPQueue k BoardPos) where
-  {-# INLINE foldPos #-}
-  foldPos f acc pq | null pq   = acc
-                   | otherwise = let ((_, pos), pq') = deleteFindMax pq
-                                 in  foldPos f (f pos acc) pq'
+  {-# INLINE foldPosTill #-}
+  foldPosTill f g acc pq
+    | nullPos pq || g acc = acc
+    | otherwise = let ((_, pos), pq') = deleteFindMax pq
+                  in  foldPosTill f (f pos acc) pq'
   nullPos = null
+-}
 
 
 infixl 8 ↩, ↪, ↻, ↺

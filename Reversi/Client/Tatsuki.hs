@@ -12,7 +12,7 @@ newtype TatsukiClient = TatsukiClient Board
 instance Client TatsukiClient where
   play (TatsukiClient board) _ = edgeToMv <$> findEdge board
   doMove (TatsukiClient board) mv _ = return $ TatsukiClient $ changeTurn $ moveBoard (mvToEdge mv) board
-  putInfo (TatsukiClient board) = putStrLn "hoge"
+  putInfo (TatsukiClient board) = getSearchLog >>= putStrLn . unlines . map show
 
 edgeToMv :: Edge -> Mv
 edgeToMv Nothing = Pass

@@ -3,6 +3,8 @@ module Reversi.Tatsuki
   , Edge
   , resetSearchLog
   , getSearchLog
+  , newNodeLog
+  , modifyNodeLog
   , findEdge
   , moveBoard
 
