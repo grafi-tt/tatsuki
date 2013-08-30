@@ -26,7 +26,7 @@ getSearchDepth :: Board -> Depth
 {-# INLINE getSearchDepth #-}
 getSearchDepth (pla, opp) =
   case popCount pla + popCount opp of
-    count | count >= 48 -> 256 + 64 - count
+    count | count >= 46 -> 256 + 64 - count
           | otherwise   -> 256 + 10
 
 getOrderDepth :: Depth -> Board -> Depth
@@ -34,23 +34,24 @@ getOrderDepth :: Depth -> Board -> Depth
 getOrderDepth depth board@(pla, opp) =
   case popCount pla + popCount opp of
     count | (count + depth) .&. 64 == 64 ->
-      let upper = if depth .&. 63 >= 12 then depth `unsafeShiftR` 5 .&. 12 else 0
-          base  = ((depth + 4) .&. 24) `unsafeShiftR` 2
-      in  upper + base - 1
+            case depth of
+              _ | depth >= (256 + 17) -> 12
+                | depth >= (256 + 14) -> 11
+                | (255 .&. depth) >= (128 + 12) -> 7
+                | depth >= 12 -> 3
+                | depth >= 5 -> 1
+                | otherwise -> 0
     otherwise -> (depth .&. 63) `unsafeShiftR` 1 - 1
+    --  let upper = if depth .&. 63 >= 12 then depth `unsafeShiftR` 5 .&. 12 else 0
+    --      base  = ((depth + 4) .&. 24) `unsafeShiftR` 2
+    --  in  upper + base - 1
 
-  --          case depth of
-  --            _ | depth >= (256 + 12) -> 11
-  --              | (255 .&. depth) >= (128 + 12) -> 7
-  --              | depth >= 12 -> 3
-  --              | depth >= 4 -> 1
-  --              | otherwise -> if depth .&. 384 == 0 then 0 else 1
 
 getOrderEval :: Depth -> Board -> EvalSel
 {-# INLINE getOrderEval #-}
 getOrderEval depth (pla, opp) =
   case (popCount pla + popCount opp) of
-    count -> 1 .&. (((depth `unsafeShiftR` 8 .&. (depth + 1) `unsafeShiftR` 4) .|. (depth `unsafeShiftR` 7 .&. (depth + 2) `unsafeShiftR` 4)) `xor` (depth + count) `unsafeShiftR` 6)
+    count -> 1 .&. ((depth `unsafeShiftR` 8 .&. (depth + 4) `unsafeShiftR` 4) `xor` (depth + count) `unsafeShiftR` 6)
 
 evaluate :: Board -> IO Score
 {-# INLINE evaluate #-}
